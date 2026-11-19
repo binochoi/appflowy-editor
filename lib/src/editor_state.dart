@@ -375,6 +375,11 @@ class EditorState {
 
     this.selection = selection;
 
+    // Only UI events wait for the next frame.
+    if (reason != SelectionUpdateReason.uiEvent) {
+      completer.complete();
+    }
+
     return completer.future;
   }
 

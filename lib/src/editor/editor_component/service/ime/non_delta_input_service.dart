@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
@@ -42,6 +43,15 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
 
   final String debounceKey = 'updateEditingValue';
 
+  // Changes from the IME are applied one at a time, in the order they arrive.
+  // Handlers are asynchronous, so running them side by side lets a later change
+  // overtake an earlier one and breaks composing text (e.g. Korean).
+  Future<void> _queue = Future.value();
+  int _pending = 0;
+
+  // A handler that never finishes must not block typing forever.
+  static const Duration _maxWait = Duration(seconds: 1);
+
   // when using gesture to move cursor on mobile, the floating cursor will be visible
   bool _isFloatingCursorVisible = false;
 
@@ -71,6 +81,12 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
     TextInputConfiguration configuration,
   ) {
     final formattedValue = textEditingValue.format();
+
+    // The document is behind the IME while changes are waiting. Sending it now
+    // would overwrite newer text in the IME with older text.
+    if (_pending > 1 && attached) {
+      return;
+    }
 
     // On Windows, the IME (e.g. Korean / other CJK) owns the editing state
     // while a composing region is active. Pushing `setEditingState` back to the
@@ -146,16 +162,33 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
       PlatformExtension.isMobile
           ? const Duration(milliseconds: 10)
           : Duration.zero,
-      () async {
+      () {
         final oldValue = _currentTextEditingValue?.copyWith();
         currentTextEditingValue = value;
-        final willApply = await apply(deltas);
-        if (!willApply) {
-          currentTextEditingValue = oldValue;
-          _textInputConnection?.setEditingState(oldValue!);
-        }
+        _enqueue(() async {
+          final willApply = await apply(deltas);
+          if (!willApply) {
+            currentTextEditingValue = oldValue;
+            _textInputConnection?.setEditingState(oldValue!);
+          }
+        });
       },
     );
+  }
+
+  void _enqueue(Future<void> Function() task) {
+    _pending++;
+    _queue = _queue.then((_) async {
+      try {
+        await task().timeout(_maxWait);
+      } on TimeoutException catch (e) {
+        AppFlowyEditorLog.input.debug('input handler timed out: $e');
+      } catch (e, s) {
+        Zone.current.handleUncaughtError(e, s);
+      } finally {
+        _pending--;
+      }
+    });
   }
 
   @override
@@ -260,14 +293,16 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
       }
 
       // valid the result
-      onDelete(
-        TextEditingDeltaDeletion(
-          oldText: oldText,
-          deletedRange: deleteRange,
-          selection: deleteSelection,
-          composing: TextRange.empty,
-        ),
-      );
+      _enqueue(() async {
+        await onDelete(
+          TextEditingDeltaDeletion(
+            oldText: oldText,
+            deletedRange: deleteRange,
+            selection: deleteSelection,
+            composing: TextRange.empty,
+          ),
+        );
+      });
     }
   }
 
