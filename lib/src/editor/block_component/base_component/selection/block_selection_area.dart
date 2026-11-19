@@ -241,6 +241,13 @@ class _BlockSelectionAreaState extends State<BlockSelectionArea> {
   }
 
   void _clearCursorRect() {
+    // 같은 블록 안에서 커서만 옮겨 가면 이전 자리를 남겨 두어 거기서부터 미끄러지게 한다
+    final selection = widget.listenable.value;
+    if (selection != null &&
+        selection.isCollapsed &&
+        selection.start.path.equals(widget.node.path)) {
+      return;
+    }
     prevCursorRect = null;
   }
 }
