@@ -58,8 +58,11 @@ class CursorState extends State<Cursor> {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fromRect(
+    // 커서가 다른 자리로 옮겨 갈 때 미끄러지듯 움직인다
+    return AnimatedPositioned.fromRect(
       rect: widget.rect,
+      duration: const Duration(milliseconds: 90),
+      curve: Curves.easeOutCubic,
       child: IgnorePointer(
         child: _buildCursor(context),
       ),
