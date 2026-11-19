@@ -338,18 +338,12 @@ class NonDeltaTextInputService extends TextInputService with TextInputClient {
   }
 
   void _updateComposing(TextEditingDelta delta) {
-    if (delta is TextEditingDeltaNonTextUpdate) {
-      composingTextRange = delta.composing;
-    } else {
-      composingTextRange = composingTextRange != null &&
-              composingTextRange!.start != -1 &&
-              delta.composing.end != -1
-          ? TextRange(
-              start: composingTextRange!.start,
-              end: delta.composing.end,
-            )
-          : delta.composing;
-    }
+    // Keep the composing range exactly as the IME reported it. Keeping the old
+    // start made the range cover text that was already committed (e.g. when an
+    // Android keyboard commits a Korean syllable and starts the next one in a
+    // single update). Sending that wider range back makes Android restart the
+    // input method, which breaks the syllable being composed.
+    composingTextRange = delta.composing;
 
     // solve the issue where the Chinese IME doesn't continue deleting after the input content has been deleted.
     if (PlatformExtension.isMacOS &&
