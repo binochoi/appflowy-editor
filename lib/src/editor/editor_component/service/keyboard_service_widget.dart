@@ -313,6 +313,12 @@ class KeyboardServiceWidgetState extends State<KeyboardServiceWidget>
       return;
     }
 
+    // Keep the selection when the whole window goes inactive (e.g. alt-tab).
+    // Flutter gives the focus back on resume, so the cursor should stay.
+    if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+
     // clear the selection when the focus is lost.
     if (!focusNode.hasFocus) {
       if (keepEditorFocusNotifier.shouldKeepFocus) {
