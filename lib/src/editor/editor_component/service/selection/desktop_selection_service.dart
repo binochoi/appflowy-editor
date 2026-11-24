@@ -89,12 +89,16 @@ class _DesktopSelectionServiceWidgetState
     super.didChangeMetrics();
 
     // Need to refresh the selection when the metrics changed.
-    if (currentSelection.value != null) {
+    // Use the editor selection, not [currentSelection]: [currentSelection] is
+    // only set by taps and drags, so it is old after typing or arrow keys.
+    // Chrome reports metric changes while an IME is composing, so the old value
+    // moved the caret back to where the user last clicked.
+    if (editorState.selection != null) {
       Debounce.debounce(
         'didChangeMetrics - update selection ',
         const Duration(milliseconds: 100),
         () {
-          final selection = currentSelection.value;
+          final selection = editorState.selection;
           if (!mounted || selection == null) {
             return;
           }

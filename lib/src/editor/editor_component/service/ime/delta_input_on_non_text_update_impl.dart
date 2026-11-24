@@ -1,5 +1,6 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/util/platform_extension.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -42,7 +43,10 @@ Future<void> onNonTextUpdate(
         ),
       );
     }
-  } else if (PlatformExtension.isMacOS) {
+  } else if (PlatformExtension.isMacOS || kIsWeb) {
+    // On the web, arrow keys pressed while an IME is composing are left to the
+    // browser, and the new caret only arrives here. Dropping it kept the caret
+    // in place.
     if (selection != null) {
       await editorState.updateSelectionWithReason(
         Selection.collapsed(
